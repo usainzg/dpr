@@ -6,7 +6,6 @@ from mininet.util import irange
 class DatacenterTopology(Topo):
 
     def build(self, fo=3):
-
         topSwitch = self.addSwitch('Ts', cls=OVSKernelSwitch, dpid='0000000100000099')
         for i in irange(1, fo):
             swAccess = self.buildSwitchToHosts(i, nHostsPerSwitch=fo)
