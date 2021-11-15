@@ -1,0 +1,1 @@
+ryu-manager --observe-links ~/flowmanager/flowmanager.py esqueleto.py

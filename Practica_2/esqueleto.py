@@ -24,6 +24,12 @@ class TreeControl13(app_manager.RyuApp):
         # paquetes 
 
         datapath = ev.msg.datapath
+        dpid = datapath.id
+
+        if dpid == 4294967449: # top-switch
+            print("top-switch")
+
+        
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         CONTROLLER_PORT = ofproto.OFPP_CONTROLLER
@@ -135,8 +141,3 @@ class TreeControl13(app_manager.RyuApp):
                          (dpid, num_ports))
                          
         num_ports = num_ports - 1 # Puertos fisicos -- quitamos el de control
-
-              
-            
-            
-
