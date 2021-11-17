@@ -25,10 +25,6 @@ class TreeControl13(app_manager.RyuApp):
 
         datapath = ev.msg.datapath
         dpid = datapath.id
-
-        if dpid == 4294967449: # top-switch
-            print("top-switch")
-
         
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -42,6 +38,7 @@ class TreeControl13(app_manager.RyuApp):
         # Solicitud de descripcion de los puertos del switch
         req = parser.OFPPortDescStatsRequest(datapath, 0)
         datapath.send_msg(req)
+        
         
         
     def add_flow_ip(self, datapath, priority, ip_src, ip_dst, out_port, buffer_id=None):
@@ -102,7 +99,7 @@ class TreeControl13(app_manager.RyuApp):
         src = eth.src
         dpid = datapath.id
 
-        self.logger.info("Packet in switch %s source %s dest. %s output %s", dpid, src, dst, in_port)
+        # self.logger.info("Packet in switch %s source %s dest. %s output %s", dpid, src, dst, in_port)
         
         out_port = ofproto.OFPP_ALL
         actions = [parser.OFPActionOutput(out_port)]
@@ -114,7 +111,7 @@ class TreeControl13(app_manager.RyuApp):
         
     @set_ev_cls(ofp_event.EventOFPPortDescStatsReply, MAIN_DISPATCHER)
     def port_desc_stats_reply_handler(self, ev):
-        # Accion de ecogida de datos con descripciones de los puertos de un switch, obtenida
+        # Accion de recogida de datos con descripciones de los puertos de un switch, obtenida
         # como respuesta a un envío de mensaje OFPPortDescStatsRequest
         # La respuesta tiene tantas secciones como puertos. Se incluye un puerto especial de control,
         # no usado para datos normales
@@ -128,16 +125,39 @@ class TreeControl13(app_manager.RyuApp):
         num_ports = 0
         for p in ev.msg.body:
             num_ports += 1
-            """
-            self.logger.info("\t port_no=%d hw_addr=%s name=%s config=0x%08x "
+            '''self.logger.info("\t port_no=%d hw_addr=%s name=%s config=0x%08x "
                              "\n \t state=0x%08x curr=0x%08x advertised=0x%08x "
                              "\n \t supported=0x%08x peer=0x%08x curr_speed=%d "
                              "max_speed=%d" %
                              (p.port_no, p.hw_addr, p.name, p.config,
                               p.state, p.curr, p.advertised, p.supported, p.peer, 
                               p.curr_speed, p.max_speed))
-            """
+            print("\n")'''
         self.logger.info("\t Total number of ports of switch %s including control: %d" % 
                          (dpid, num_ports))
                          
-        num_ports = num_ports - 1 # Puertos fisicos -- quitamos el de control
+        fo = num_ports - 1 # fo+1
+
+        if dpid == 4294967449: # top-switch
+            for i in range(fo):
+                self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst='10.0.{}.0/24'.format(i+1), out_port=i+1)
+        else:
+            self.populate_switch(dpid=dpid, fo=fo, datapath=datapath)
+    
+    def populate_switch(self, dpid, fo, datapath):
+        # Internal traffic...
+        for i in range(fo-1):
+            # TODO: preguntar a Josemi si aqui hay que diferenciar entre
+            # local y no-local!!!
+            # ip_src = '10.0.{}.0/24'.format(dpid)
+            ip_src = '10.0.0.0/16'
+            ip_dst = '10.0.{}.{}'.format(dpid, i+1)
+            port = i+2
+            self.add_flow_ip(datapath=datapath, priority=3, ip_src=ip_src, ip_dst=ip_dst, out_port=port)
+        
+        # External traffic
+        for i in range(fo-1):
+            if i != dpid:
+                ip = '10.0.{}.0/24'.format(i+1)
+                port = 1
+                self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst=ip, out_port=port)
