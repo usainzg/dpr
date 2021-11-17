@@ -3,6 +3,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_3
+from ryu.ofproto import ether
 from ryu.lib.packet import packet
 from ryu.lib.packet import ethernet
 from ryu.lib.packet import ether_types
@@ -95,11 +96,16 @@ class TreeControl13(app_manager.RyuApp):
         in_port = msg.match['in_port']
         pkt = packet.Packet(msg.data)
         eth = pkt.get_protocols(ethernet.ethernet)[0]
+
+        if eth.ethertype == ether_types.ETH_TYPE_LLDP:
+            # TODO: comentar a Josemi... ignore lldp packet!
+            return
+
         dst = eth.dst
         src = eth.src
         dpid = datapath.id
 
-        # self.logger.info("Packet in switch %s source %s dest. %s output %s", dpid, src, dst, in_port)
+        self.logger.info("Packet type %s in switch %s source %s dest. %s output %s",  eth.ethertype, dpid, src, dst, in_port)
         
         out_port = ofproto.OFPP_ALL
         actions = [parser.OFPActionOutput(out_port)]
@@ -141,6 +147,13 @@ class TreeControl13(app_manager.RyuApp):
         if dpid == 4294967449: # top-switch
             for i in range(fo):
                 self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst='10.0.{}.0/24'.format(i+1), out_port=i+1)
+            # ARP inundar
+            ofproto = datapath.ofproto
+            out_port = ofproto.OFPP_FLOOD
+            parser = datapath.ofproto_parser
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ARP)
+            actions = [parser.OFPActionOutput(out_port)]
+            self.add_flow(datapath=datapath, priority=2, match=match, actions=actions)
         else:
             self.populate_switch(dpid=dpid, fo=fo, datapath=datapath)
     
@@ -156,8 +169,16 @@ class TreeControl13(app_manager.RyuApp):
             self.add_flow_ip(datapath=datapath, priority=3, ip_src=ip_src, ip_dst=ip_dst, out_port=port)
         
         # External traffic
-        for i in range(fo-1):
-            if i != dpid:
+        for i in range(fo-1): # no contamos el puerto 1
+            if i+1 != dpid:
                 ip = '10.0.{}.0/24'.format(i+1)
                 port = 1
                 self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst=ip, out_port=port)
+
+        # ARP inundar
+        ofproto = datapath.ofproto
+        out_port = ofproto.OFPP_FLOOD
+        parser = datapath.ofproto_parser
+        match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ARP)
+        actions = [parser.OFPActionOutput(out_port)]
+        self.add_flow(datapath=datapath, priority=2, match=match, actions=actions)
