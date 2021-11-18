@@ -1,0 +1,1 @@
+ryu-manager --observe-links ~/flowmanager/flowmanager.py ryu.app.simple_switch_13

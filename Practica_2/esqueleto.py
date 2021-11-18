@@ -98,7 +98,7 @@ class TreeControl13(app_manager.RyuApp):
         eth = pkt.get_protocols(ethernet.ethernet)[0]
 
         if eth.ethertype == ether_types.ETH_TYPE_LLDP:
-            # TODO: comentar a Josemi... ignore lldp packet!
+            # Ignoramos el trafico LLDP.
             return
 
         dst = eth.dst
@@ -142,12 +142,14 @@ class TreeControl13(app_manager.RyuApp):
         self.logger.info("\t Total number of ports of switch %s including control: %d" % 
                          (dpid, num_ports))
                          
-        fo = num_ports - 1 # fo+1
+        num_ports = num_ports - 1 # quitar puerto control
 
         if dpid == 4294967449: # top-switch
+            fo = num_ports # en el switch Ts, fo=(numero de puertos - puerto control)
             for i in range(fo):
                 self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst='10.0.{}.0/24'.format(i+1), out_port=i+1)
-            # ARP inundar
+            
+            # ARP => inundar
             ofproto = datapath.ofproto
             out_port = ofproto.OFPP_FLOOD
             parser = datapath.ofproto_parser
@@ -155,27 +157,30 @@ class TreeControl13(app_manager.RyuApp):
             actions = [parser.OFPActionOutput(out_port)]
             self.add_flow(datapath=datapath, priority=2, match=match, actions=actions)
         else:
-            self.populate_switch(dpid=dpid, fo=fo, datapath=datapath)
+            fo = num_ports - 1 # para switches sn, quitamos puerto de control y puerto 1 para obtener fo.
+            self.populate_switch(dpid=dpid, fo=fo, datapath=datapath) # switches (s1, s2, ..., sn), donde n es fo
     
+    
+    '''
+    Funcion que introduce los flujos necesarios en el switch con dpid=dpid,
+    realizando una configuracion adecuada teniendo en cuenta el numero de hosts (fo=fo)
+    y manteniendo la coherencia de las direcciones IP.
+    '''
     def populate_switch(self, dpid, fo, datapath):
-        # Internal traffic...
-        for i in range(fo-1):
-            # TODO: preguntar a Josemi si aqui hay que diferenciar entre
-            # local y no-local!!!
-            # ip_src = '10.0.{}.0/24'.format(dpid)
-            ip_src = '10.0.0.0/16'
+        # Internal traffic
+        for i in range(fo):
             ip_dst = '10.0.{}.{}'.format(dpid, i+1)
             port = i+2
-            self.add_flow_ip(datapath=datapath, priority=3, ip_src=ip_src, ip_dst=ip_dst, out_port=port)
+            self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst=ip_dst, out_port=port)
         
         # External traffic
-        for i in range(fo-1): # no contamos el puerto 1
+        for i in range(fo):
             if i+1 != dpid:
                 ip = '10.0.{}.0/24'.format(i+1)
                 port = 1
                 self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst=ip, out_port=port)
 
-        # ARP inundar
+        # ARP => inundar
         ofproto = datapath.ofproto
         out_port = ofproto.OFPP_FLOOD
         parser = datapath.ofproto_parser
