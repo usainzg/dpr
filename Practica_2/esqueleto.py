@@ -144,6 +144,7 @@ class TreeControl13(app_manager.RyuApp):
                          
         num_ports = num_ports - 1 # quitar puerto control
 
+    # ==== INICIO CODIGO PROPIO ====
         if dpid == 4294967449: # top-switch
             fo = num_ports # en el switch Ts, fo=(numero de puertos - puerto control)
             for i in range(fo):
@@ -167,13 +168,13 @@ class TreeControl13(app_manager.RyuApp):
     y manteniendo la coherencia de las direcciones IP.
     '''
     def populate_switch(self, dpid, fo, datapath):
-        # Internal traffic
+        # Trafico interno
         for i in range(fo):
             ip_dst = '10.0.{}.{}'.format(dpid, i+1)
             port = i+2
             self.add_flow_ip(datapath=datapath, priority=2, ip_src=None, ip_dst=ip_dst, out_port=port)
         
-        # External traffic
+        # Trafico externo
         for i in range(fo):
             if i+1 != dpid:
                 ip = '10.0.{}.0/24'.format(i+1)
@@ -187,3 +188,5 @@ class TreeControl13(app_manager.RyuApp):
         match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_ARP)
         actions = [parser.OFPActionOutput(out_port)]
         self.add_flow(datapath=datapath, priority=2, match=match, actions=actions)
+
+    # ==== FIN CODIGO PROPIO ====
